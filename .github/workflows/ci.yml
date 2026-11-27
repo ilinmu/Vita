@@ -25,10 +25,11 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { goos: darwin, goarch: arm64 }
-          - { goos: darwin, goarch: amd64 }
-          - { goos: linux, goarch: amd64 }
-          - { goos: linux, goarch: arm64 }
+          - { goos: darwin, goarch: arm64, ext: "" }
+          - { goos: darwin, goarch: amd64, ext: "" }
+          - { goos: linux, goarch: amd64, ext: "" }
+          - { goos: linux, goarch: arm64, ext: "" }
+          - { goos: windows, goarch: amd64, ext: ".exe" }
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
@@ -41,7 +42,7 @@ jobs:
           CGO_ENABLED: "0"
         run: |
           mkdir -p dist
-          go build -trimpath -ldflags "-s -w" -o "dist/vita-server-${GOOS}-${GOARCH}" ./cmd/vita-server
+          go build -trimpath -ldflags "-s -w" -o "dist/vita-server-${GOOS}-${GOARCH}${{ matrix.ext }}" ./cmd/vita-server
       - uses: actions/upload-artifact@v4
         with:
           name: vita-server-${{ matrix.goos }}-${{ matrix.goarch }}

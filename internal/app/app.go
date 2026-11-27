@@ -292,7 +292,7 @@ func (a *App) cycleTheme(c *ui.Context) {
 	c.Toast(labels[a.ThemeIdx])
 }
 
-// TriggerSync runs a non-blocking incremental sync against the Mac mini / cloud server.
+// TriggerSync runs a non-blocking incremental sync against the configured sync server.
 func (a *App) TriggerSync(c *ui.Context, silent bool) {
 	cfg := a.Store.Config()
 	if cfg.AuthToken == "" || cfg.FamilyID == "" {
@@ -786,7 +786,7 @@ func (a *App) renderSheets(c *ui.Context, pal Palette, member model.Member, hasM
 	mobile.Sheet(c, &a.ShowAuthSheet, mobile.SheetOptions{Detents: []float32{0.75}, Label: "账号同步"}, func() {
 		ui.Scroll(c).Grow(1).Basis(0).Children(func() {
 			ui.Column(c).Padding(8, 16, 24, 16).Gap(12).Children(func() {
-				ui.Text(c, "连接 Mac mini 同步服务").FontSize(18).Bold()
+				ui.Text(c, "连接自托管同步服务").FontSize(18).Bold()
 				ui.Segmented(c, &a.AuthModeIdx, "登录已有账号", "注册新账号").FillEqually().Label("认证模式")
 
 				ui.Text(c, "用户名").FontSize(13).TextColor(t.TextMuted)
@@ -862,7 +862,7 @@ func (a *App) openMedForm() {
 func (a *App) submitAuth(c *ui.Context) {
 	cfg := a.Store.Config()
 	if cfg.LANURL == "" && cfg.PublicURL == "" {
-		c.Toast("请先保存 Mac mini 局域网或外网服务器地址")
+		c.Toast("请先保存局域网或外网同步服务器地址")
 		return
 	}
 	a.Syncer.SetEndpoints(cfg.LANURL, cfg.PublicURL)

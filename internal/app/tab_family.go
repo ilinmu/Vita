@@ -99,15 +99,15 @@ func (a *App) familyTab(c *ui.Context, pal Palette) {
 				}
 			})
 
-			// 3. Mac mini Sync Server Endpoints & Account
+			// 3. Self-hosted Sync Server Endpoints & Account
 			ui.Column(c).PaddingX(16).Gap(8).Children(func() {
-				ui.Text(c, "Mac mini 双地址同步设置").FontSize(13).TextColor(t.TextMuted)
+				ui.Text(c, "自托管双地址同步设置").FontSize(13).TextColor(t.TextMuted)
 				ui.Column(c).Padding(14).Radius(12).Background(pal.Card).Border(1, t.Border).Gap(10).Children(func() {
-					ui.Text(c, "局域网主地址（在家 Wi-Fi 优先毫秒直连）").FontSize(12).TextColor(t.TextMuted)
+					ui.Text(c, "局域网主地址（在家 Wi-Fi 优先直连，如 NAS / 家庭主机）").FontSize(12).TextColor(t.TextMuted)
 					ui.TextInput(c, &a.ServerLANInput).Placeholder("http://192.168.1.50:8420").
 						Keyboard(ui.KeyboardURL).Autocorrect(false).Capitalize(ui.CapitalizeNone).Label("局域网地址")
 
-					ui.Text(c, "外网备用地址（Cloudflare Tunnel HTTPS，出门自动切换）").FontSize(12).TextColor(t.TextMuted)
+					ui.Text(c, "外网备用地址（公网 HTTPS 反向代理或内网穿透，外出自动切换）").FontSize(12).TextColor(t.TextMuted)
 					ui.TextInput(c, &a.ServerPublicInput).Placeholder("https://vita.yourdomain.com").
 						Keyboard(ui.KeyboardURL).Autocorrect(false).Capitalize(ui.CapitalizeNone).Label("外网地址")
 

@@ -1,0 +1,17 @@
+[Unit]
+Description=Vita Family Health Sync Server
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=vita
+Group=vita
+WorkingDirectory=/opt/vita
+ExecStart=/opt/vita/vita-server -addr :8420 -data /opt/vita/data
+Environment=VITA_ALLOW_PUBLIC_REGISTER=false
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

@@ -160,13 +160,13 @@ func (a *App) emptyOnboardingCard(c *ui.Context, pal Palette) {
 	t := c.Theme()
 	ui.Column(c).Padding(24).Radius(16).Background(pal.Card).Border(1, t.Border).Gap(12).AlignItems(ui.Center).Children(func() {
 		ui.Text(c, "欢迎使用 Vita").FontSize(22).Bold()
-		ui.Text(c, "记录家人的身高体重生长曲线与发烧体温变化，离线可用，支持 Mac mini 双机同步。").
+		ui.Text(c, "记录家人的身高体重生长曲线与发烧体温变化，离线可用，支持自托管多设备同步。").
 			FontSize(14).TextColor(t.TextMuted).TextAlign(ui.Center)
 		if ui.PrimaryButton(c, "+ 添加第一位家庭成员").FillWidth().Clicked() {
 			a.openNewMemberForm()
 		}
 		if a.Store.Config().AuthToken == "" {
-			if ui.Button(c, "或登录已有 Mac mini 家庭账号").FillWidth().Clicked() {
+			if ui.Button(c, "或登录已有同步家庭账号").FillWidth().Clicked() {
 				a.ShowAuthSheet = true
 			}
 		}

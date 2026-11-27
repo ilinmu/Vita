@@ -1,0 +1,18 @@
+services:
+  vita-server:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    container_name: vita-server
+    restart: unless-stopped
+    ports:
+      - "8420:8420"
+    volumes:
+      - ./data:/data
+    environment:
+      VITA_ADDR: ":8420"
+      VITA_DATA_DIR: "/data"
+      # 首次注册第一个账号后建议改为 false（家人仍可凭邀请码注册加入）
+      VITA_ALLOW_PUBLIC_REGISTER: "true"
+      # 可选：手动固定 JWT 密钥；留空会在 /data/jwt.secret 自动生成并持久化
+      # VITA_JWT_SECRET: "change-me-to-a-long-random-string"

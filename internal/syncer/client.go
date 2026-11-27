@@ -28,7 +28,7 @@ func (e *APIError) Error() string {
 	return fmt.Sprintf("HTTP %d: %s", e.Status, e.Message)
 }
 
-// Client communicates with the Mac mini / cloud Vita sync server.
+// Client communicates with a self-hosted Vita sync server.
 type Client struct {
 	mu             sync.RWMutex
 	lanURL         string

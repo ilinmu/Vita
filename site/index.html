@@ -1,0 +1,260 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Vita — 极简纯 Go 家庭生长曲线与发烧体温记录</title>
+  <meta name="description" content="Vita — 100% 纯 Go 原生跨端应用（iOS / Android / macOS）+ 自托管同步服务端，记录家庭成员身高体重生长曲线与发烧体温趋势。" />
+  <link rel="icon" type="image/png" href="./icon.png" />
+  <style>
+    :root {
+      --bg: #f8fafc;
+      --surface: #ffffff;
+      --surface-soft: #f1f5f9;
+      --border: #e2e8f0;
+      --text: #0f172a;
+      --muted: #64748b;
+      --teal: #0d9488;
+      --teal-soft: rgba(13, 148, 136, 0.12);
+      --indigo: #6366f1;
+      --red: #ef4444;
+      --amber: #f59e0b;
+      --shadow: 0 12px 32px rgba(15, 23, 42, 0.06);
+    }
+    [data-theme="dark"] {
+      --bg: #0b1120;
+      --surface: #151f32;
+      --surface-soft: #1e293b;
+      --border: #263449;
+      --text: #f1f5f9;
+      --muted: #94a3b8;
+      --teal: #2dd4bf;
+      --teal-soft: rgba(45, 212, 191, 0.14);
+      --indigo: #818cf8;
+      --red: #f87171;
+      --amber: #fbbf24;
+      --shadow: 0 14px 36px rgba(0, 0, 0, 0.35);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", "Noto Sans SC", system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+    }
+    a { color: inherit; text-decoration: none; }
+    .wrap { max-width: 1040px; margin: 0 auto; padding: 0 24px; }
+    header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 20px 0; border-bottom: 1px solid var(--border);
+    }
+    .brand { display: flex; align-items: center; gap: 12px; font-weight: 700; font-size: 20px; letter-spacing: -0.02em; }
+    .brand img { width: 36px; height: 36px; border-radius: 9px; }
+    .nav { display: flex; align-items: center; gap: 14px; font-size: 14px; color: var(--muted); }
+    .nav a:hover { color: var(--text); }
+    .theme-btn {
+      border: 1px solid var(--border); background: var(--surface); color: var(--text);
+      border-radius: 999px; padding: 6px 12px; font-size: 13px; cursor: pointer;
+    }
+    .hero { padding: 64px 0 44px; text-align: center; }
+    .pill {
+      display: inline-flex; align-items: center; gap: 8px;
+      background: var(--teal-soft); color: var(--teal);
+      padding: 6px 14px; border-radius: 999px; font-size: 13px; font-weight: 600;
+      margin-bottom: 18px;
+    }
+    h1 {
+      font-size: clamp(32px, 5vw, 52px); line-height: 1.15; margin: 0 0 16px;
+      letter-spacing: -0.03em; font-weight: 800;
+    }
+    .lead {
+      max-width: 680px; margin: 0 auto 28px; font-size: 17px; color: var(--muted);
+    }
+    .actions { display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; }
+    .btn {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 12px 22px; border-radius: 12px; font-weight: 600; font-size: 15px;
+      border: 1px solid var(--border); background: var(--surface);
+      transition: transform .12s ease, border-color .12s ease;
+    }
+    .btn:hover { transform: translateY(-1px); border-color: var(--teal); }
+    .btn-primary { background: var(--teal); color: #ffffff; border-color: transparent; }
+    [data-theme="dark"] .btn-primary { color: #042f2e; }
+    .showcase {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 20px; margin: 24px 0 56px;
+    }
+    .card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 18px; padding: 22px; box-shadow: var(--shadow);
+    }
+    .card-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 12px; }
+    .card-title { font-weight: 700; font-size: 16px; }
+    .card-sub { font-size: 12px; color: var(--muted); }
+    svg.chart { width: 100%; height: auto; display: block; border-radius: 12px; background: var(--surface-soft); }
+    .grid {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 16px; margin-bottom: 56px;
+    }
+    .feat h3 { margin: 0 0 6px; font-size: 16px; }
+    .feat p { margin: 0; font-size: 14px; color: var(--muted); }
+    .deploy-box {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 18px; padding: 28px; margin-bottom: 64px;
+    }
+    .deploy-box h2 { margin: 0 0 8px; font-size: 22px; }
+    .deploy-box p { margin: 0 0 18px; color: var(--muted); font-size: 15px; }
+    pre {
+      margin: 0; padding: 16px; border-radius: 12px; overflow-x: auto;
+      background: var(--surface-soft); border: 1px solid var(--border);
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px;
+    }
+    footer {
+      border-top: 1px solid var(--border); padding: 26px 0 40px;
+      display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px;
+      font-size: 13px; color: var(--muted);
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <a class="brand" href="./">
+        <img src="./icon.png" alt="Vita icon" />
+        <span>Vita</span>
+      </a>
+      <nav class="nav">
+        <a href="https://github.com/ilinmu/Vita/releases">Releases</a>
+        <a href="https://github.com/ilinmu/Vita/blob/main/deploy/README.md">部署文档</a>
+        <a href="https://github.com/ilinmu/Vita">GitHub</a>
+        <button class="theme-btn" id="themeToggle" type="button">切换主题</button>
+      </nav>
+    </header>
+
+    <section class="hero">
+      <div class="pill">100% 纯 Go 原生跨端 · Via / Toki 极简家族</div>
+      <h1>把家人的成长曲线与体温变化<br />安静地掌握在自己手里</h1>
+      <p class="lead">
+        一套纯 Go 代码编译 iOS、Android、macOS 客户端（基于 <code>egoist/mygo</code> GPU Native UI），
+        离线可用，并支持自托管 Go + SQLite 同步服务端。
+      </p>
+      <div class="actions">
+        <a class="btn btn-primary" href="https://github.com/ilinmu/Vita/releases/latest">下载最新版本</a>
+        <a class="btn" href="https://github.com/ilinmu/Vita">查看 GitHub 源码</a>
+        <a class="btn" href="https://github.com/ilinmu/Vita/blob/main/deploy/README.md">自托管部署指南</a>
+      </div>
+    </section>
+
+    <section class="showcase">
+      <div class="card">
+        <div class="card-head">
+          <span class="card-title">儿童生长曲线（中国标准 / WHO）</span>
+          <span class="card-sub">P3 – P97 百分位带 + 自定义指标</span>
+        </div>
+        <svg class="chart" viewBox="0 0 460 220" aria-label="Growth curve preview">
+          <g stroke="currentColor" stroke-opacity="0.08" stroke-width="1">
+            <line x1="36" y1="40" x2="436" y2="40"/><line x1="36" y1="85" x2="436" y2="85"/>
+            <line x1="36" y1="130" x2="436" y2="130"/><line x1="36" y1="175" x2="436" y2="175"/>
+          </g>
+          <path d="M36,178 C130,145 250,108 436,52 L436,118 C250,152 130,174 36,194 Z" fill="#0d9488" fill-opacity="0.12"/>
+          <path d="M36,182 C130,154 250,122 436,70 L436,100 C250,140 130,166 36,190 Z" fill="#0d9488" fill-opacity="0.18"/>
+          <path d="M36,186 C130,160 250,131 436,85" fill="none" stroke="#0d9488" stroke-opacity="0.55" stroke-width="1.6" stroke-dasharray="5 4"/>
+          <path d="M36,184 C110,160 185,138 265,116 C335,98 385,84 420,76" fill="none" stroke="#0d9488" stroke-width="3"/>
+          <g fill="#0d9488" stroke="#ffffff" stroke-width="2">
+            <circle cx="36" cy="184" r="4.5"/><circle cx="135" cy="153" r="4.5"/>
+            <circle cx="235" cy="124" r="4.5"/><circle cx="335" cy="98" r="4.5"/>
+            <circle cx="420" cy="76" r="5.5"/>
+          </g>
+        </svg>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <span class="card-title">发烧体温与退烧药叠加趋势</span>
+          <span class="card-sub">38.5℃ 警戒线 · 测温/用药间隔计时</span>
+        </div>
+        <svg class="chart" viewBox="0 0 460 220" aria-label="Fever trend preview">
+          <g stroke="currentColor" stroke-opacity="0.08" stroke-width="1">
+            <line x1="36" y1="40" x2="436" y2="40"/><line x1="36" y1="85" x2="436" y2="85"/>
+            <line x1="36" y1="130" x2="436" y2="130"/><line x1="36" y1="175" x2="436" y2="175"/>
+          </g>
+          <line x1="36" y1="85" x2="436" y2="85" stroke="#ef4444" stroke-opacity="0.85" stroke-width="1.6" stroke-dasharray="6 4"/>
+          <line x1="172" y1="24" x2="172" y2="195" stroke="#6366f1" stroke-opacity="0.75" stroke-width="1.6" stroke-dasharray="4 4"/>
+          <circle cx="172" cy="30" r="5.5" fill="#6366f1"/>
+          <path d="M46,122 C96,90 132,58 172,54 C225,52 272,118 334,136 C376,148 408,154 426,156" fill="none" stroke="#ef4444" stroke-width="3"/>
+          <circle cx="46" cy="122" r="4.5" fill="#f59e0b" stroke="#ffffff" stroke-width="1.5"/>
+          <circle cx="110" cy="74" r="4.5" fill="#ef4444" stroke="#ffffff" stroke-width="1.5"/>
+          <circle cx="172" cy="54" r="5" fill="#ef4444" stroke="#ffffff" stroke-width="1.5"/>
+          <circle cx="265" cy="112" r="4.5" fill="#f59e0b" stroke="#ffffff" stroke-width="1.5"/>
+          <circle cx="355" cy="142" r="4.5" fill="#16a34a" stroke="#ffffff" stroke-width="1.5"/>
+          <circle cx="426" cy="156" r="4.5" fill="#16a34a" stroke="#ffffff" stroke-width="1.5"/>
+        </svg>
+      </div>
+    </section>
+
+    <section class="grid">
+      <div class="card feat">
+        <h3>中国标准 &amp; WHO 双参考</h3>
+        <p>内置国家卫健委 WS/T 423-2022 与 WHO LMS 百分位算法，一键切换；支持身高、体重、头围、BMI 及自定义指标。</p>
+      </div>
+      <div class="card feat">
+        <h3>按病程归档发烧记录</h3>
+        <p>顶部实时显示距上次测温与上次用药时长，体温曲线叠加 38.5℃ 警戒线与服药点，就诊回顾一目了然。</p>
+      </div>
+      <div class="card feat">
+        <h3>离线优先 · 双地址无缝同步</h3>
+        <p>断网秒记；支持配置局域网直连地址与外网 HTTPS 备用地址，在家局域网毫秒同步，出门自动切外网。</p>
+      </div>
+      <div class="card feat">
+        <h3>不限设备的轻量自托管</h3>
+        <p>服务端仅单一 Go + SQLite 二进制（~15 MB 内存），支持 Docker、Linux VPS、NAS、树莓派、macOS 与 Windows。</p>
+      </div>
+      <div class="card feat">
+        <h3>双主题 &amp; 夜间护眼</h3>
+        <p>默认跟随系统浅色/深色外观，支持顶部一键切换深色模式，半夜测体温不刺眼。</p>
+      </div>
+      <div class="card feat">
+        <h3>高清 PNG 与表格导出</h3>
+        <p>生长曲线与发烧走势可一键渲染导出 1200×720 PNG 图片，另有完整 JSON 备份与 UTF-8 CSV 表格。</p>
+      </div>
+    </section>
+
+    <section class="deploy-box">
+      <h2>30 秒启动自托管同步服务端</h2>
+      <p>任何可长期在线的 Linux 服务器、NAS、树莓派、macOS 或 Windows 设备均可作为家庭同步节点（关闭公开注册后，家人仍可凭 6 位邀请码加入）：</p>
+      <pre><code># 方式 1：Docker Compose
+docker compose -f deploy/docker-compose.yml up -d
+
+# 方式 2：单二进制直接运行（从 Releases 下载对应平台版本）
+./vita-server -addr :8420 -data ./data</code></pre>
+    </section>
+
+    <footer>
+      <span>Vita · Pure-Go Family Growth &amp; Fever Tracker</span>
+      <span><a href="https://github.com/ilinmu/Vita">github.com/ilinmu/Vita</a></span>
+    </footer>
+  </div>
+
+  <script>
+    (function () {
+      const root = document.documentElement;
+      const btn = document.getElementById("themeToggle");
+      const saved = localStorage.getItem("vita-site-theme");
+      const preferDark = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
+      let dark = saved ? saved === "dark" : preferDark;
+      function apply() {
+        root.setAttribute("data-theme", dark ? "dark" : "light");
+        btn.textContent = dark ? "浅色模式" : "深色模式";
+      }
+      apply();
+      btn.addEventListener("click", function () {
+        dark = !dark;
+        localStorage.setItem("vita-site-theme", dark ? "dark" : "light");
+        apply();
+      });
+    })();
+  </script>
+</body>
+</html>

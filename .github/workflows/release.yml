@@ -16,10 +16,11 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { goos: darwin, goarch: arm64 }
-          - { goos: darwin, goarch: amd64 }
-          - { goos: linux, goarch: amd64 }
-          - { goos: linux, goarch: arm64 }
+          - { goos: darwin, goarch: arm64, ext: "" }
+          - { goos: darwin, goarch: amd64, ext: "" }
+          - { goos: linux, goarch: amd64, ext: "" }
+          - { goos: linux, goarch: arm64, ext: "" }
+          - { goos: windows, goarch: amd64, ext: ".exe" }
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
@@ -32,13 +33,17 @@ jobs:
           CGO_ENABLED: "0"
         run: |
           mkdir -p release-assets
-          BIN="vita-server"
+          BIN="vita-server${{ matrix.ext }}"
           go build -trimpath -ldflags "-s -w" -o "$BIN" ./cmd/vita-server
-          tar -czf "release-assets/vita-server-${GOOS}-${GOARCH}.tar.gz" "$BIN" deploy/macmini
+          if [ "$GOOS" = "windows" ]; then
+            zip -r "release-assets/vita-server-${GOOS}-${GOARCH}.zip" "$BIN" Dockerfile deploy
+          else
+            tar -czf "release-assets/vita-server-${GOOS}-${GOARCH}.tar.gz" "$BIN" Dockerfile deploy
+          fi
       - uses: actions/upload-artifact@v4
         with:
           name: server-${{ matrix.goos }}-${{ matrix.goarch }}
-          path: release-assets/*.tar.gz
+          path: release-assets/*
 
   build-android:
     name: Android APK
@@ -169,9 +174,16 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          find artifacts -type f -print
-          FILES=$(find artifacts -type f)
-          gh release create "$GITHUB_REF_NAME" $FILES \
-            --repo "$GITHUB_REPOSITORY" \
-            --title "Vita $GITHUB_REF_NAME" \
-            --generate-notes
+          FILES=()
+          while IFS= read -r -d '' f; do
+            FILES+=("$f")
+          done < <(find artifacts -type f -print0)
+          printf '%s\n' "${FILES[@]}"
+          if gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
+            gh release upload "$GITHUB_REF_NAME" "${FILES[@]}" --repo "$GITHUB_REPOSITORY" --clobber
+          else
+            gh release create "$GITHUB_REF_NAME" "${FILES[@]}" \
+              --repo "$GITHUB_REPOSITORY" \
+              --title "Vita $GITHUB_REF_NAME" \
+              --generate-notes
+          fi
