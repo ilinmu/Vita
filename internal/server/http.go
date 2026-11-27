@@ -27,7 +27,7 @@ type Server struct {
 // New constructs a Server with registered routes.
 func New(db *DB, opts Options) *Server {
 	if opts.Version == "" {
-		opts.Version = "0.1.0"
+		opts.Version = "0.2.0"
 	}
 	s := &Server{
 		db:   db,

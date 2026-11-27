@@ -2,7 +2,7 @@
   "name": "Vita",
   "slug": "vita",
   "identifier": "com.ilinmu.vita",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "main": "./cmd/vita",
   "out": "build",
   "icon": "resources/icon.png",
