@@ -1,0 +1,23 @@
+{
+  "name": "Vita",
+  "slug": "vita",
+  "identifier": "com.ilinmu.vita",
+  "version": "0.1.0",
+  "main": "./cmd/vita",
+  "out": "build",
+  "icon": "resources/icon.png",
+  "linux": { "webview": false },
+  "ios": {
+    "minimumSystemVersion": "17.0",
+    "distribution": "app-store",
+    "orientations": ["portrait"]
+  },
+  "android": {
+    "minSdk": 26,
+    "adaptiveIcon": {
+      "foreground": "resources/icon-foreground.png",
+      "background": "#0F172A"
+    },
+    "splash": "#0F172A"
+  }
+}

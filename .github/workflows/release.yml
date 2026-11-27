@@ -1,0 +1,177 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-server:
+    name: Server (${{ matrix.goos }}/${{ matrix.goarch }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { goos: darwin, goarch: arm64 }
+          - { goos: darwin, goarch: amd64 }
+          - { goos: linux, goarch: amd64 }
+          - { goos: linux, goarch: arm64 }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Build & Package Server
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          CGO_ENABLED: "0"
+        run: |
+          mkdir -p release-assets
+          BIN="vita-server"
+          go build -trimpath -ldflags "-s -w" -o "$BIN" ./cmd/vita-server
+          tar -czf "release-assets/vita-server-${GOOS}-${GOARCH}.tar.gz" "$BIN" deploy/macmini
+      - uses: actions/upload-artifact@v4
+        with:
+          name: server-${{ matrix.goos }}-${{ matrix.goarch }}
+          path: release-assets/*.tar.gz
+
+  build-android:
+    name: Android APK
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - name: Ensure Android NDK
+        run: |
+          SDK="${ANDROID_HOME:-/usr/local/lib/android/sdk}"
+          echo "ANDROID_HOME=$SDK" >> "$GITHUB_ENV"
+          if [ -z "${ANDROID_NDK_HOME:-}" ] || [ ! -d "${ANDROID_NDK_HOME:-}" ]; then
+            NDK_DIR="$(ls -1d "$SDK/ndk/"* 2>/dev/null | sort -V | tail -n 1 || true)"
+            if [ -z "$NDK_DIR" ]; then
+              yes | "$SDK/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null || true
+              "$SDK/cmdline-tools/latest/bin/sdkmanager" "ndk;27.2.12479018" "platforms;android-35" "build-tools;35.0.0"
+              NDK_DIR="$(ls -1d "$SDK/ndk/"* | sort -V | tail -n 1)"
+            fi
+            echo "ANDROID_NDK_HOME=$NDK_DIR" >> "$GITHUB_ENV"
+          fi
+      - name: Optional Android Keystore
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+        run: |
+          if [ -n "$ANDROID_KEYSTORE_BASE64" ]; then
+            echo "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/upload.jks"
+            jq --arg ks "$RUNNER_TEMP/upload.jks" --arg alias "${ANDROID_KEY_ALIAS:-upload}" \
+              '.android.keystore = $ks | .android.keyAlias = $alias' mygo.json > mygo.tmp.json
+            mv mygo.tmp.json mygo.json
+          fi
+      - name: Build Android APK
+        env:
+          MYGO_ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          MYGO_ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: go tool mygo build -platform android/arm64
+      - uses: actions/upload-artifact@v4
+        with:
+          name: android-apk
+          path: build/**/*.apk
+
+  build-macos:
+    name: macOS App
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - run: go tool mygo build -platform darwin/arm64
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macos-dmg
+          path: build/**/*.dmg
+
+  build-ios:
+    name: iOS IPA / TestFlight (when Apple secrets configured)
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Build iOS IPA & optionally upload to TestFlight
+        env:
+          IOS_CERT_B64: ${{ secrets.IOS_CERTIFICATE_BASE64 }}
+          IOS_CERT_PW: ${{ secrets.IOS_CERTIFICATE_PASSWORD }}
+          IOS_PROFILE_B64: ${{ secrets.IOS_PROVISIONING_PROFILE_BASE64 }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          MYGO_ASC_KEY_ID: ${{ secrets.MYGO_ASC_KEY_ID }}
+          MYGO_ASC_ISSUER_ID: ${{ secrets.MYGO_ASC_ISSUER_ID }}
+          ASC_KEY_B64: ${{ secrets.MYGO_ASC_KEY_BASE64 }}
+        run: |
+          if [ -z "$IOS_CERT_B64" ] || [ -z "$IOS_PROFILE_B64" ] || [ -z "$APPLE_TEAM_ID" ]; then
+            echo "Apple signing secrets not configured; skipping iOS .ipa build."
+            exit 0
+          fi
+
+          keychain="$RUNNER_TEMP/ios-signing.keychain-db"
+          pw="$(openssl rand -base64 24)"
+          security create-keychain -p "$pw" "$keychain"
+          security set-keychain-settings -lut 21600 "$keychain"
+          security unlock-keychain -p "$pw" "$keychain"
+          echo "$IOS_CERT_B64" | base64 --decode > "$RUNNER_TEMP/ios-cert.p12"
+          security import "$RUNNER_TEMP/ios-cert.p12" -k "$keychain" -P "$IOS_CERT_PW" -T /usr/bin/codesign
+          rm -f "$RUNNER_TEMP/ios-cert.p12"
+          security set-key-partition-list -S apple-tool:,apple: -s -k "$pw" "$keychain"
+          security list-keychains -d user -s "$keychain" login.keychain
+
+          mkdir -p "$HOME/Library/MobileDevice/Provisioning Profiles"
+          echo "$IOS_PROFILE_B64" | base64 --decode > "$RUNNER_TEMP/vita.mobileprovision"
+          cp "$RUNNER_TEMP/vita.mobileprovision" "$HOME/Library/MobileDevice/Provisioning Profiles/"
+
+          jq --arg team "$APPLE_TEAM_ID" --arg prof "$RUNNER_TEMP/vita.mobileprovision" \
+            '.ios.team = $team | .ios.provisioningProfile = $prof' mygo.json > mygo.tmp.json
+          mv mygo.tmp.json mygo.json
+
+          go tool mygo build -platform ios
+
+          if [ -n "$MYGO_ASC_KEY_ID" ] && [ -n "$MYGO_ASC_ISSUER_ID" ] && [ -n "$ASC_KEY_B64" ]; then
+            echo "$ASC_KEY_B64" | base64 --decode > "$RUNNER_TEMP/AuthKey.p8"
+            export MYGO_ASC_KEY="$RUNNER_TEMP/AuthKey.p8"
+            go tool mygo publish -platform ios
+          fi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ios-ipa
+          path: build/**/*.ipa
+          if-no-files-found: ignore
+
+  publish-release:
+    name: Create GitHub Release
+    needs: [build-server, build-android, build-macos, build-ios]
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          find artifacts -type f -print
+          FILES=$(find artifacts -type f)
+          gh release create "$GITHUB_REF_NAME" $FILES \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "Vita $GITHUB_REF_NAME" \
+            --generate-notes

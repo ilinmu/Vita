@@ -1,0 +1,110 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    name: Vet & Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - run: go vet ./...
+      - run: go test -race ./...
+
+  build-server:
+    name: Build Sync Server (${{ matrix.goos }}/${{ matrix.goarch }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { goos: darwin, goarch: arm64 }
+          - { goos: darwin, goarch: amd64 }
+          - { goos: linux, goarch: amd64 }
+          - { goos: linux, goarch: arm64 }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Build vita-server
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          CGO_ENABLED: "0"
+        run: |
+          mkdir -p dist
+          go build -trimpath -ldflags "-s -w" -o "dist/vita-server-${GOOS}-${GOARCH}" ./cmd/vita-server
+      - uses: actions/upload-artifact@v4
+        with:
+          name: vita-server-${{ matrix.goos }}-${{ matrix.goarch }}
+          path: dist/vita-server-*
+
+  build-android:
+    name: Build Android APK
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - name: Ensure Android NDK & SDK tools
+        run: |
+          SDK="${ANDROID_HOME:-/usr/local/lib/android/sdk}"
+          echo "ANDROID_HOME=$SDK" >> "$GITHUB_ENV"
+          if [ -z "${ANDROID_NDK_HOME:-}" ] || [ ! -d "${ANDROID_NDK_HOME:-}" ]; then
+            NDK_DIR="$(ls -1d "$SDK/ndk/"* 2>/dev/null | sort -V | tail -n 1 || true)"
+            if [ -z "$NDK_DIR" ]; then
+              yes | "$SDK/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null || true
+              "$SDK/cmdline-tools/latest/bin/sdkmanager" "ndk;27.2.12479018" "platforms;android-35" "build-tools;35.0.0"
+              NDK_DIR="$(ls -1d "$SDK/ndk/"* | sort -V | tail -n 1)"
+            fi
+            echo "ANDROID_NDK_HOME=$NDK_DIR" >> "$GITHUB_ENV"
+          fi
+      - name: Optional Android Keystore
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+        run: |
+          if [ -n "$ANDROID_KEYSTORE_BASE64" ]; then
+            echo "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/upload.jks"
+            jq --arg ks "$RUNNER_TEMP/upload.jks" --arg alias "${ANDROID_KEY_ALIAS:-upload}" \
+              '.android.keystore = $ks | .android.keyAlias = $alias' mygo.json > mygo.tmp.json
+            mv mygo.tmp.json mygo.json
+          fi
+      - name: Build Android arm64 APK
+        env:
+          MYGO_ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          MYGO_ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: go tool mygo build -platform android/arm64
+      - uses: actions/upload-artifact@v4
+        with:
+          name: vita-android-apk
+          path: build/**/*.apk
+
+  build-macos:
+    name: Build macOS App
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - run: go tool mygo build -platform darwin/arm64
+      - uses: actions/upload-artifact@v4
+        with:
+          name: vita-macos-arm64
+          path: |
+            build/**/*.dmg
+            build/**/*.app

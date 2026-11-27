@@ -1,0 +1,16 @@
+build/
+.mygo/
+dist/
+data/
+*.db
+*.db-wal
+*.db-shm
+.DS_Store
+*.ipa
+*.apk
+*.aab
+*.jks
+*.p12
+*.mobileprovision
+jwt.secret
+vita_state.json*
