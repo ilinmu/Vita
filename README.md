@@ -1,8 +1,6 @@
 # Vita
 
-> **Vita**（拉丁语：生命、体征）—— 一款极简、纯 Go 编写、离线优先的家庭成员生长曲线与发烧体温记录应用（同系列：`Via` · `Toki`）。
-
-🌐 **项目主页**：https://ilinmu.github.io/Vita/ ｜ 📦 **版本下载**：[GitHub Releases](https://github.com/ilinmu/Vita/releases)
+> **Vita** —— 极简、纯 Go 编写、离线优先的家庭成员生长曲线与发烧体温记录应用。
 
 一套纯 Go 代码同时编译为 **iOS**、**Android**、**macOS** 客户端，并附带轻量的 **Go + SQLite** 自托管同步服务端，支持单二进制或 Docker 部署，可运行在 Linux 云服务器、NAS、树莓派、macOS 或 Windows 等任意常用设备上。
 
@@ -22,7 +20,7 @@
 - **离线优先 & 双地址增量同步**：
   - 手机本地原子持久化存储，断网/半夜秒记；联网后双向增量合并（UUID + 软删除 + LWW）。
   - 支持同时配置 **局域网主地址**（在家 Wi-Fi 优先直连家庭主机/NAS）与 **外网备用 HTTPS 地址**（反向代理或内网穿透，外出自动无缝切换）。
-  - 账号密码登录 + 6 位家庭邀请码 + 一键关闭公开注册（关闭后仍凭邀请码加入）。
+  - 账号密码登录 + 6 位家庭邀请码 + 一键关闭公开注册（关闭后仍可凭邀请码加入）。
 - **主题与导出**：浅色 / 深色双主题（默认跟随系统，一键切换夜间模式）；支持 **JSON 备份**、**UTF-8 BOM CSV 表格**、以及生长曲线/发烧曲线 **高清 PNG 导出**。
 
 ---
@@ -44,11 +42,11 @@ go run ./cmd/vita-server -addr :8420 -data ./data
 
 ---
 
-## GitHub Actions 自动打包、Pages 与发布
+## GitHub Actions 自动打包与发布
 
 - **CI（[.github/workflows/ci.yml](.github/workflows/ci.yml)）**：每次推送到 `main` 或发起 PR，自动运行 `go vet` + `go test -race`，并构建 `vita-server`（Linux / macOS / Windows）、Android `.apk` 与 macOS 应用。
-- **Releases（[.github/workflows/release.yml](.github/workflows/release.yml)）**：推送 `v*` 标签（如 `git tag v0.1.0 && git push origin v0.1.0`）自动打包各平台产物并发布到 [Releases](https://github.com/ilinmu/Vita/releases)。
-- **Pages（[.github/workflows/pages.yml](.github/workflows/pages.yml)）**：自动构建并发布项目介绍页至 https://ilinmu.github.io/Vita/。
+- **Release（[.github/workflows/release.yml](.github/workflows/release.yml)）**：推送 `v*` 标签（如 `git tag v0.1.0 && git push origin v0.1.0`）自动打包各平台产物并发布 Release。
+- **Pages（[.github/workflows/pages.yml](.github/workflows/pages.yml)）**：自动构建并部署静态展示页。
 
 ### 可选 Secrets 配置（用于正式签名或 TestFlight 自动上传）
 

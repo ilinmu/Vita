@@ -82,7 +82,7 @@ func (a *App) feverTab(c *ui.Context, pal Palette, member model.Member, hasMembe
 			allTemps := a.Store.TemperatureRecords(member.ID, a.FeverEpisodeID)
 			allMeds := a.Store.MedicationRecords(member.ID, a.FeverEpisodeID)
 
-			toTime := now
+			toTime := now.Add(45 * time.Minute)
 			fromTime := now.Add(-span)
 			if a.FeverEpisodeID != "" && len(allTemps) > 0 {
 				lastRec := time.UnixMilli(allTemps[len(allTemps)-1].RecordedAt)
