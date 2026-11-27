@@ -40,27 +40,12 @@ func (a *App) familyTab(c *ui.Context, pal Palette) {
 							Title:    m.Name,
 							Subtitle: fmt.Sprintf("%s · %s (%s)", gTxt, m.AgeLabelAt(time.Now()), m.BirthDate),
 							Leading: func() {
-								ui.Box(c).Size(28, 28).Radius(14).Background(ui.Hex(m.ColorHex))
+								renderMemberAvatar(c, m, 34)
 							},
 							Disclosure: true,
 						})
 						if row.Clicked() {
-							a.EditMemberID = m.ID
-							a.MemberName = m.Name
-							if m.Gender == model.GenderFemale {
-								a.MemberGenderIdx = 1
-							} else {
-								a.MemberGenderIdx = 0
-							}
-							a.MemberBirth = m.BirthDate
-							a.MemberColorIdx = 0
-							for idx, hex := range memberSwatches {
-								if hex == m.ColorHex {
-									a.MemberColorIdx = idx
-									break
-								}
-							}
-							a.ShowMemberForm = true
+							a.openEditMemberForm(m)
 						}
 					})
 				}

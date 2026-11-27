@@ -29,14 +29,7 @@ func (a *App) overviewTab(c *ui.Context, pal Palette, member model.Member, hasMe
 			// Member Hero Card
 			ui.Column(c).Padding(16).Radius(16).Background(pal.Card).Border(1, t.Border).Gap(10).Children(func() {
 				ui.Row(c).AlignItems(ui.Center).Gap(12).Children(func() {
-					ui.Box(c).Size(44, 44).Radius(22).Background(ui.Hex(member.ColorHex)).Center().Children(func() {
-						initial := "V"
-						for _, r := range member.Name {
-							initial = string(r)
-							break
-						}
-						ui.Text(c, initial).FontSize(18).Bold().TextColor(ui.RGB(255, 255, 255))
-					})
+					renderMemberAvatar(c, member, 48)
 					ui.Column(c).Grow(1).Basis(0).Gap(2).Children(func() {
 						ui.Row(c).AlignItems(ui.Center).Gap(8).Children(func() {
 							ui.Text(c, member.Name).FontSize(18).Bold()
@@ -125,11 +118,8 @@ func (a *App) overviewTab(c *ui.Context, pal Palette, member model.Member, hasMe
 					a.quickActionCard(c, pal, "+ 身高体重", "生长 & 头围", pal.Teal, pal.TealSoft, a.openGrowthForm)
 				})
 				ui.Row(c).Gap(10).Children(func() {
-					a.quickActionCard(c, pal, "+ 退烧药/降温", "布洛芬/物理降温", pal.Indigo, pal.IndigoSoft, a.openMedForm)
-					a.quickActionCard(c, pal, "+ 自定义指标", "脚长/视力等", pal.Amber, pal.AmberSoft, func() {
-						a.CustomValInput, a.CustomValNote = "", ""
-						a.ShowCustomValForm = true
-					})
+					a.quickActionCard(c, pal, "+ 退烧药/降温", "退烧药 / 物理降温", pal.Indigo, pal.IndigoSoft, a.openMedForm)
+					a.quickActionCard(c, pal, "+ 自定义指标", "脚长/视力等", pal.Amber, pal.AmberSoft, a.openCustomValForm)
 				})
 			})
 

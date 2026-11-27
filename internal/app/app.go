@@ -55,41 +55,52 @@ type App struct {
 	ShowJoinSheet      bool
 
 	// Form buffers: Member
-	EditMemberID    string
-	MemberName      string
-	MemberGenderIdx int // 0=male, 1=female
-	MemberBirth     string
-	MemberColorIdx  int
+	EditMemberID          string
+	MemberName            string
+	MemberGenderIdx       int // 0=male, 1=female
+	MemberBirthTime       time.Time
+	MemberBirthExpanded   bool
+	MemberColorIdx        int
 
 	// Form buffers: Temperature
-	TempInput     string
-	TempSiteIdx   int // 0=ear, 1=armpit, 2=forehead, 3=oral
-	TempSymptom   string
-	TempNote      string
-	TempEpisodeID string
+	TempInput          string
+	TempSiteIdx        int // 0=ear, 1=armpit, 2=forehead, 3=oral
+	TempSymptom        string
+	TempNote           string
+	TempEpisodeID      string
+	TempTime           time.Time
+	TempTimeExpanded   bool
+	TempTimeModeIdx    int
 
 	// Form buffers: Growth
-	GrowthHeight string
-	GrowthWeight string
-	GrowthHead   string
-	GrowthNote   string
+	GrowthHeight       string
+	GrowthWeight       string
+	GrowthHead         string
+	GrowthNote         string
+	GrowthDate         time.Time
+	GrowthDateExpanded bool
 
 	// Form buffers: Medication / Cooling
-	MedTypeIdx int // 0=ibuprofen, 1=acetaminophen, 2=physical, 3=other
-	MedName    string
-	MedDosage  string
-	MedNote    string
+	MedTypeIdx       int // 0=antipyretic, 1=physical
+	MedName          string
+	MedDosage        string
+	MedNote          string
+	MedTime          time.Time
+	MedTimeExpanded  bool
+	MedTimeModeIdx   int
 
 	// Form buffers: Fever Episode
 	EpisodeTitle string
 	EpisodeNote  string
 
 	// Form buffers: Custom Metric Definition & Value
-	CustomMetricName string
-	CustomMetricUnit string
-	CustomValMetric  string
-	CustomValInput   string
-	CustomValNote    string
+	CustomMetricName      string
+	CustomMetricUnit      string
+	CustomValMetric       string
+	CustomValInput        string
+	CustomValNote         string
+	CustomValDate         time.Time
+	CustomValDateExpanded bool
 
 	// Form buffers: Sync & Auth
 	ServerLANInput    string
@@ -119,6 +130,8 @@ func New(store *localstore.Store, syncClient *syncer.Client) *App {
 	if cfg.LastStandard == string(growth.StandardWHO) {
 		stdIdx = 1
 	}
+	now := time.Now()
+	today := time.Date(now.Year(), now.Month(), now.Day(), 12, 0, 0, 0, now.Location())
 	return &App{
 		Store:             store,
 		Syncer:            syncClient,
@@ -129,7 +142,11 @@ func New(store *localstore.Store, syncClient *syncer.Client) *App {
 		TempSiteIdx:       siteToIdx(cfg.LastTempSite),
 		ServerLANInput:    cfg.LANURL,
 		ServerPublicInput: cfg.PublicURL,
-		MemberBirth:       time.Now().AddDate(-1, 0, 0).Format("2006-01-02"),
+		MemberBirthTime:   today.AddDate(-1, 0, 0),
+		GrowthDate:        today,
+		CustomValDate:     today,
+		TempTime:          now,
+		MedTime:           now,
 	}
 }
 
@@ -160,16 +177,10 @@ func idxToSite(i int) model.TempSite {
 }
 
 func idxToMedType(i int) model.MedType {
-	switch i {
-	case 0:
-		return model.MedIbuprofen
-	case 1:
-		return model.MedAcetaminophen
-	case 2:
+	if i == 1 {
 		return model.MedPhysical
-	default:
-		return model.MedOther
 	}
+	return model.MedAntipyretic
 }
 
 func tabIcon(draw func(p *ui.Path, r ui.Rect)) func(p *ui.Painter, r ui.Rect, color ui.Color) {
@@ -214,10 +225,13 @@ var navTabs = []mobile.BarButton{
 // View renders Vita's entire responsive UI tree.
 func (a *App) View(c *ui.Context) {
 	cfg := a.Store.Config()
-	theme, pal := resolveTheme(c, cfg.ThemeMode)
-	c.SetTheme(theme)
-
 	member, hasMember := a.Store.ActiveMember()
+	memberColor := ""
+	if hasMember {
+		memberColor = member.ColorHex
+	}
+	theme, pal := resolveTheme(c, cfg.ThemeMode, memberColor)
+	c.SetTheme(theme)
 
 	ui.Column(c).Fill().Background(theme.Background).Children(func() {
 		a.renderTopBar(c, pal, member, hasMember)
@@ -377,14 +391,7 @@ func (a *App) renderSheets(c *ui.Context, pal Palette, member model.Member, hasM
 						return t.Border
 					}()).AlignItems(ui.Center).Gap(12)
 					row.Children(func() {
-						ui.Box(c).Size(36, 36).Radius(18).Background(ui.Hex(m.ColorHex)).Center().Children(func() {
-							initial := "V"
-							for _, r := range m.Name {
-								initial = string(r)
-								break
-							}
-							ui.Text(c, initial).Bold().TextColor(ui.RGB(255, 255, 255))
-						})
+						renderMemberAvatar(c, m, 38)
 						ui.Column(c).Grow(1).Basis(0).Gap(2).Children(func() {
 							ui.Text(c, m.Name).Bold()
 							gLabel := "男"
@@ -415,7 +422,7 @@ func (a *App) renderSheets(c *ui.Context, pal Palette, member model.Member, hasM
 	})
 
 	// 2. Member add/edit sheet
-	mobile.Sheet(c, &a.ShowMemberForm, mobile.SheetOptions{Detents: []float32{0.68}, Label: "成员档案"}, func() {
+	mobile.Sheet(c, &a.ShowMemberForm, mobile.SheetOptions{Detents: []float32{0.78, 0.92}, Label: "成员档案"}, func() {
 		ui.Scroll(c).Grow(1).Basis(0).Children(func() {
 			ui.Column(c).Padding(8, 16, 24, 16).Gap(12).Children(func() {
 				title := "添加成员"
@@ -423,19 +430,35 @@ func (a *App) renderSheets(c *ui.Context, pal Palette, member model.Member, hasM
 					title = "编辑成员"
 				}
 				ui.Text(c, title).FontSize(18).Bold()
+
+				// Live Avatar Preview
+				previewGender := model.GenderMale
+				if a.MemberGenderIdx == 1 {
+					previewGender = model.GenderFemale
+				}
+				previewMember := model.Member{
+					Name:      a.MemberName,
+					Gender:    previewGender,
+					BirthDate: a.MemberBirthTime.Format("2006-01-02"),
+					ColorHex:  memberSwatches[a.MemberColorIdx%len(memberSwatches)],
+				}
+				ui.Row(c).FillWidth().Justify(ui.Center).Children(func() {
+					renderMemberAvatar(c, previewMember, 64)
+				})
+
 				ui.Text(c, "姓名 / 昵称").FontSize(13).TextColor(t.TextMuted)
 				ui.TextInput(c, &a.MemberName).Placeholder("例如：小核桃").Label("姓名")
 
-				ui.Text(c, "性别（用于匹配生长参考标准）").FontSize(13).TextColor(t.TextMuted)
+				ui.Text(c, "性别（用于默认头像与生长参考标准）").FontSize(13).TextColor(t.TextMuted)
 				ui.Segmented(c, &a.MemberGenderIdx, "男", "女").FillEqually().Label("性别")
 
-				ui.Text(c, "出生日期 (YYYY-MM-DD)").FontSize(13).TextColor(t.TextMuted)
-				ui.TextInput(c, &a.MemberBirth).Placeholder("2024-06-01").Label("出生日期")
+				nowY := time.Now().Year()
+				datePickerField(c, pal, "member-birth", "出生日期", &a.MemberBirthTime, &a.MemberBirthExpanded, 1940, nowY, false)
 
-				ui.Text(c, "标识颜色").FontSize(13).TextColor(t.TextMuted)
+				ui.Text(c, "标识颜色（选中成员后将作为界面主色）").FontSize(13).TextColor(t.TextMuted)
 				ui.Row(c).Gap(10).Children(func() {
 					for i, hex := range memberSwatches {
-						box := ui.Box(c.Key(i)).Size(30, 30).Radius(15).Background(ui.Hex(hex))
+						box := ui.Box(c.Key(i)).Size(32, 32).Radius(16).Background(ui.Hex(hex))
 						if i == a.MemberColorIdx {
 							box.Border(3, t.Text)
 						}
@@ -451,10 +474,6 @@ func (a *App) renderSheets(c *ui.Context, pal Palette, member model.Member, hasM
 						c.Toast("请输入姓名")
 						return
 					}
-					if _, err := time.Parse("2006-01-02", strings.TrimSpace(a.MemberBirth)); err != nil {
-						c.Toast("日期格式应为 YYYY-MM-DD")
-						return
-					}
 					g := model.GenderMale
 					if a.MemberGenderIdx == 1 {
 						g = model.GenderFemale
@@ -463,7 +482,7 @@ func (a *App) renderSheets(c *ui.Context, pal Palette, member model.Member, hasM
 						ID:        a.EditMemberID,
 						Name:      name,
 						Gender:    g,
-						BirthDate: strings.TrimSpace(a.MemberBirth),
+						BirthDate: a.MemberBirthTime.Format("2006-01-02"),
 						ColorHex:  memberSwatches[a.MemberColorIdx%len(memberSwatches)],
 					})
 					if err != nil {
@@ -482,20 +501,29 @@ func (a *App) renderSheets(c *ui.Context, pal Palette, member model.Member, hasM
 	})
 
 	// 3. Temperature log sheet
-	mobile.Sheet(c, &a.ShowTempForm, mobile.SheetOptions{Detents: []float32{0.72}, Label: "记录体温"}, func() {
+	mobile.Sheet(c, &a.ShowTempForm, mobile.SheetOptions{Detents: []float32{0.82, 0.94}, Label: "记录体温"}, func() {
 		ui.Scroll(c).Grow(1).Basis(0).Children(func() {
 			ui.Column(c).Padding(8, 16, 24, 16).Gap(12).Children(func() {
 				ui.Text(c, "记录体温").FontSize(18).Bold()
 				ui.Text(c, "体温 (℃)").FontSize(13).TextColor(t.TextMuted)
 				ui.TextInput(c, &a.TempInput).Placeholder("例如 38.5").Keyboard(ui.KeyboardDecimal).Label("体温")
 
+				dateTimePickerField(c, pal, "temp-dt", "测量日期与时间", &a.TempTime, &a.TempTimeExpanded, &a.TempTimeModeIdx)
+
 				ui.Text(c, "测温部位（自动记住上次选择）").FontSize(13).TextColor(t.TextMuted)
 				ui.Segmented(c, &a.TempSiteIdx, "耳温", "腋温", "额温", "口温").FillEqually().Label("测温部位")
 
-				ui.Text(c, "伴随症状（可选）").FontSize(13).TextColor(t.TextMuted)
-				ui.TextInput(c, &a.TempSymptom).Placeholder("如：精神尚可、轻微流涕").Label("症状")
+				ui.Text(c, "伴随症状（可点选标签或自行输入）").FontSize(13).TextColor(t.TextMuted)
+				quickTagPicker(c, pal, "temp-sym-tags", &a.TempSymptom, []string{
+					"精神尚可", "精神萎靡", "嗜睡", "手脚冰凉", "畏寒",
+					"出汗", "流涕鼻塞", "咳嗽", "呕吐", "食欲差", "起疹子",
+				}, true)
+				ui.TextInput(c, &a.TempSymptom).Placeholder("可点选上方症状标签或输入").Label("症状")
 
-				ui.Text(c, "备注（可选）").FontSize(13).TextColor(t.TextMuted)
+				ui.Text(c, "备注（可点选标签或自行输入）").FontSize(13).TextColor(t.TextMuted)
+				quickTagPicker(c, pal, "temp-note-tags", &a.TempNote, []string{
+					"睡前测量", "半夜复测", "服药后复测", "物理降温后", "刚睡醒", "已就医",
+				}, true)
 				ui.TextInput(c, &a.TempNote).Placeholder("补充说明").Label("备注")
 
 				if ui.PrimaryButton(c, "保存体温").FillWidth().Clicked() {
@@ -513,12 +541,13 @@ func (a *App) renderSheets(c *ui.Context, pal Palette, member model.Member, hasM
 						epID = a.FeverEpisodeID
 					}
 					_, err = a.Store.SaveTemperatureRecord(model.TemperatureRecord{
-						MemberID:  member.ID,
-						EpisodeID: epID,
-						TempC:     val,
-						Site:      idxToSite(a.TempSiteIdx),
-						Symptom:   strings.TrimSpace(a.TempSymptom),
-						Note:      strings.TrimSpace(a.TempNote),
+						MemberID:   member.ID,
+						EpisodeID:  epID,
+						RecordedAt: a.TempTime.UnixMilli(),
+						TempC:      val,
+						Site:       idxToSite(a.TempSiteIdx),
+						Symptom:    strings.TrimSpace(a.TempSymptom),
+						Note:       strings.TrimSpace(a.TempNote),
 					})
 					if err != nil {
 						c.Toast("保存失败: " + err.Error())
@@ -533,10 +562,14 @@ func (a *App) renderSheets(c *ui.Context, pal Palette, member model.Member, hasM
 	})
 
 	// 4. Growth log sheet
-	mobile.Sheet(c, &a.ShowGrowthForm, mobile.SheetOptions{Detents: []float32{0.72}, Label: "记录生长发育"}, func() {
+	mobile.Sheet(c, &a.ShowGrowthForm, mobile.SheetOptions{Detents: []float32{0.82, 0.94}, Label: "记录生长发育"}, func() {
 		ui.Scroll(c).Grow(1).Basis(0).Children(func() {
 			ui.Column(c).Padding(8, 16, 24, 16).Gap(12).Children(func() {
 				ui.Text(c, "记录身高体重").FontSize(18).Bold()
+
+				nowY := time.Now().Year()
+				datePickerField(c, pal, "growth-date", "测量日期", &a.GrowthDate, &a.GrowthDateExpanded, nowY-20, nowY+1, true)
+
 				ui.Text(c, "身高 (cm，可留空)").FontSize(13).TextColor(t.TextMuted)
 				ui.TextInput(c, &a.GrowthHeight).Placeholder("例如 88.5").Keyboard(ui.KeyboardDecimal).Label("身高")
 
@@ -546,8 +579,9 @@ func (a *App) renderSheets(c *ui.Context, pal Palette, member model.Member, hasM
 				ui.Text(c, "头围 (cm，0-3岁常用，可留空)").FontSize(13).TextColor(t.TextMuted)
 				ui.TextInput(c, &a.GrowthHead).Placeholder("例如 48.2").Keyboard(ui.KeyboardDecimal).Label("头围")
 
-				ui.Text(c, "备注（可选）").FontSize(13).TextColor(t.TextMuted)
-				ui.TextInput(c, &a.GrowthNote).Placeholder("如：1岁半儿保体检").Label("备注")
+				ui.Text(c, "备注（可点选常用标签或输入）").FontSize(13).TextColor(t.TextMuted)
+				quickTagPicker(c, pal, "growth-note-tags", &a.GrowthNote, growthNoteTags(member, hasMember, a.GrowthDate), true)
+				ui.TextInput(c, &a.GrowthNote).Placeholder("如：居家自测、2岁体检").Label("备注")
 
 				if ui.PrimaryButton(c, "保存测量记录").FillWidth().Clicked() {
 					if !hasMember {
@@ -585,6 +619,7 @@ func (a *App) renderSheets(c *ui.Context, pal Palette, member model.Member, hasM
 					}
 					_, err := a.Store.SaveGrowthRecord(model.GrowthRecord{
 						MemberID:   member.ID,
+						RecordedAt: a.GrowthDate.UnixMilli(),
 						HeightCM:   hPtr,
 						WeightKG:   wPtr,
 						HeadCircCM: hcPtr,
@@ -603,20 +638,42 @@ func (a *App) renderSheets(c *ui.Context, pal Palette, member model.Member, hasM
 	})
 
 	// 5. Medication / cooling sheet
-	mobile.Sheet(c, &a.ShowMedForm, mobile.SheetOptions{Detents: []float32{0.72}, Label: "记录退烧药/降温"}, func() {
+	mobile.Sheet(c, &a.ShowMedForm, mobile.SheetOptions{Detents: []float32{0.82, 0.94}, Label: "记录退烧药/降温"}, func() {
 		ui.Scroll(c).Grow(1).Basis(0).Children(func() {
 			ui.Column(c).Padding(8, 16, 24, 16).Gap(12).Children(func() {
 				ui.Text(c, "记录退烧药 / 物理降温").FontSize(18).Bold()
-				ui.Text(c, "类型").FontSize(13).TextColor(t.TextMuted)
-				ui.Segmented(c, &a.MedTypeIdx, "布洛芬", "对乙酰", "物理降温", "其他").FillEqually().Label("用药类型")
+				ui.Text(c, "处理类型").FontSize(13).TextColor(t.TextMuted)
+				ui.Segmented(c, &a.MedTypeIdx, "退烧药", "物理降温").FillEqually().Label("处理类型")
 
-				ui.Text(c, "名称（如：美林、泰诺林、温水擦浴）").FontSize(13).TextColor(t.TextMuted)
-				ui.TextInput(c, &a.MedName).Placeholder("可选，默认按类型名").Label("名称")
+				dateTimePickerField(c, pal, "med-dt", "日期与时间", &a.MedTime, &a.MedTimeExpanded, &a.MedTimeModeIdx)
 
-				ui.Text(c, "剂量 / 说明（仅记录，不作医嘱）").FontSize(13).TextColor(t.TextMuted)
-				ui.TextInput(c, &a.MedDosage).Placeholder("例如：4 ml 或 贴退热贴").Label("剂量")
+				nameTags := []string{"美林", "泰诺林", "布洛芬混悬液", "对乙酰氨基酚滴剂", "退热栓"}
+				dosageTags := []string{"2 ml", "2.5 ml", "3 ml", "4 ml", "5 ml", "6 ml", "7.5 ml", "半粒", "1 粒"}
+				noteTags := []string{"饭后服用", "多喝温水", "配合退热贴", "睡前服用", "吐出少量"}
+				nameLabel := "退烧药名称"
+				dosageLabel := "剂量（仅记录，不作医嘱）"
+				namePh := "例如：美林、泰诺林"
+				dosagePh := "例如：4 ml"
+				if a.MedTypeIdx == 1 {
+					nameTags = []string{"温水擦浴", "退热贴", "温水澡", "减少衣物", "多喝温水", "冰袋冷敷"}
+					dosageTags = []string{"10 分钟", "15 分钟", "20 分钟", "贴额头", "温水 37℃"}
+					noteTags = []string{"手脚转暖", "出汗换干衣", "配合休息", "状态平稳"}
+					nameLabel = "物理降温方式"
+					dosageLabel = "时长 / 方式说明（可选）"
+					namePh = "例如：温水擦浴、退热贴"
+					dosagePh = "例如：15 分钟"
+				}
+
+				ui.Text(c, nameLabel).FontSize(13).TextColor(t.TextMuted)
+				quickTagPicker(c, pal, "med-name-tags", &a.MedName, nameTags, false)
+				ui.TextInput(c, &a.MedName).Placeholder(namePh).Label("名称")
+
+				ui.Text(c, dosageLabel).FontSize(13).TextColor(t.TextMuted)
+				quickTagPicker(c, pal, "med-dose-tags", &a.MedDosage, dosageTags, false)
+				ui.TextInput(c, &a.MedDosage).Placeholder(dosagePh).Label("剂量")
 
 				ui.Text(c, "备注（可选）").FontSize(13).TextColor(t.TextMuted)
+				quickTagPicker(c, pal, "med-note-tags", &a.MedNote, noteTags, true)
 				ui.TextInput(c, &a.MedNote).Placeholder("补充说明").Label("备注")
 
 				if ui.PrimaryButton(c, "保存处理记录").FillWidth().Clicked() {
@@ -630,12 +687,13 @@ func (a *App) renderSheets(c *ui.Context, pal Palette, member model.Member, hasM
 						name = model.MedTypeLabel(mt)
 					}
 					_, err := a.Store.SaveMedicationRecord(model.MedicationRecord{
-						MemberID:  member.ID,
-						EpisodeID: a.FeverEpisodeID,
-						MedType:   mt,
-						Name:      name,
-						Dosage:    strings.TrimSpace(a.MedDosage),
-						Note:      strings.TrimSpace(a.MedNote),
+						MemberID:   member.ID,
+						EpisodeID:  a.FeverEpisodeID,
+						RecordedAt: a.MedTime.UnixMilli(),
+						MedType:    mt,
+						Name:       name,
+						Dosage:     strings.TrimSpace(a.MedDosage),
+						Note:       strings.TrimSpace(a.MedNote),
 					})
 					if err != nil {
 						c.Toast("保存失败: " + err.Error())
@@ -751,6 +809,8 @@ func (a *App) renderSheets(c *ui.Context, pal Palette, member model.Member, hasM
 						}
 					}
 				})
+				nowY := time.Now().Year()
+				datePickerField(c, pal, "custom-date", "测量日期", &a.CustomValDate, &a.CustomValDateExpanded, nowY-20, nowY+1, true)
 				ui.Text(c, "数值").FontSize(13).TextColor(t.TextMuted)
 				ui.TextInput(c, &a.CustomValInput).Placeholder("输入数值").Keyboard(ui.KeyboardDecimal).Label("数值")
 				ui.TextInput(c, &a.CustomValNote).Placeholder("备注（可选）").Label("备注")
@@ -765,10 +825,11 @@ func (a *App) renderSheets(c *ui.Context, pal Palette, member model.Member, hasM
 						return
 					}
 					_, err = a.Store.SaveCustomMetricRecord(model.CustomMetricRecord{
-						MemberID: member.ID,
-						MetricID: a.CustomValMetric,
-						Value:    v,
-						Note:     strings.TrimSpace(a.CustomValNote),
+						MemberID:   member.ID,
+						MetricID:   a.CustomValMetric,
+						RecordedAt: a.CustomValDate.UnixMilli(),
+						Value:      v,
+						Note:       strings.TrimSpace(a.CustomValNote),
 					})
 					if err != nil {
 						c.Toast("保存失败: " + err.Error())
@@ -825,12 +886,42 @@ func (a *App) renderSheets(c *ui.Context, pal Palette, member model.Member, hasM
 	})
 }
 
+func todayNoon() time.Time {
+	now := time.Now()
+	return time.Date(now.Year(), now.Month(), now.Day(), 12, 0, 0, 0, now.Location())
+}
+
 func (a *App) openNewMemberForm() {
 	a.EditMemberID = ""
 	a.MemberName = ""
 	a.MemberGenderIdx = 0
-	a.MemberBirth = time.Now().AddDate(-1, 0, 0).Format("2006-01-02")
+	a.MemberBirthTime = todayNoon().AddDate(-1, 0, 0)
+	a.MemberBirthExpanded = false
 	a.MemberColorIdx = len(a.Store.Members()) % len(memberSwatches)
+	a.ShowMemberForm = true
+}
+
+func (a *App) openEditMemberForm(m model.Member) {
+	a.EditMemberID = m.ID
+	a.MemberName = m.Name
+	if m.Gender == model.GenderFemale {
+		a.MemberGenderIdx = 1
+	} else {
+		a.MemberGenderIdx = 0
+	}
+	if bd, err := m.ParseBirthDate(); err == nil {
+		a.MemberBirthTime = time.Date(bd.Year(), bd.Month(), bd.Day(), 12, 0, 0, 0, time.Local)
+	} else {
+		a.MemberBirthTime = todayNoon().AddDate(-1, 0, 0)
+	}
+	a.MemberBirthExpanded = false
+	a.MemberColorIdx = 0
+	for idx, hex := range memberSwatches {
+		if strings.EqualFold(hex, m.ColorHex) {
+			a.MemberColorIdx = idx
+			break
+		}
+	}
 	a.ShowMemberForm = true
 }
 
@@ -840,6 +931,9 @@ func (a *App) openTempForm() {
 	a.TempNote = ""
 	a.TempEpisodeID = a.FeverEpisodeID
 	a.TempSiteIdx = siteToIdx(a.Store.Config().LastTempSite)
+	a.TempTime = time.Now()
+	a.TempTimeExpanded = false
+	a.TempTimeModeIdx = 0
 	a.ShowTempForm = true
 }
 
@@ -848,6 +942,8 @@ func (a *App) openGrowthForm() {
 	a.GrowthWeight = ""
 	a.GrowthHead = ""
 	a.GrowthNote = ""
+	a.GrowthDate = todayNoon()
+	a.GrowthDateExpanded = false
 	a.ShowGrowthForm = true
 }
 
@@ -856,7 +952,23 @@ func (a *App) openMedForm() {
 	a.MedName = ""
 	a.MedDosage = ""
 	a.MedNote = ""
+	a.MedTime = time.Now()
+	a.MedTimeExpanded = false
+	a.MedTimeModeIdx = 0
 	a.ShowMedForm = true
+}
+
+func (a *App) openCustomValForm() {
+	a.CustomValInput = ""
+	a.CustomValNote = ""
+	a.CustomValDate = todayNoon()
+	a.CustomValDateExpanded = false
+	a.ShowCustomValForm = true
+}
+
+func (a *App) openCustomValFormFor(metricID string) {
+	a.CustomValMetric = metricID
+	a.openCustomValForm()
 }
 
 func (a *App) submitAuth(c *ui.Context) {

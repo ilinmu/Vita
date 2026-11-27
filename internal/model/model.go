@@ -47,6 +47,7 @@ func SiteLabel(s TempSite) string {
 type MedType string
 
 const (
+	MedAntipyretic   MedType = "antipyretic"
 	MedIbuprofen     MedType = "ibuprofen"
 	MedAcetaminophen MedType = "acetaminophen"
 	MedPhysical      MedType = "physical"
@@ -56,16 +57,12 @@ const (
 // MedTypeLabel returns a concise Chinese label for a medication/cooling type.
 func MedTypeLabel(m MedType) string {
 	switch m {
-	case MedIbuprofen:
-		return "布洛芬"
-	case MedAcetaminophen:
-		return "对乙酰氨基酚"
 	case MedPhysical:
 		return "物理降温"
-	case MedOther:
-		return "其他处理"
+	case MedAntipyretic, MedIbuprofen, MedAcetaminophen, MedOther:
+		return "退烧药"
 	default:
-		return "其他处理"
+		return "退烧药"
 	}
 }
 

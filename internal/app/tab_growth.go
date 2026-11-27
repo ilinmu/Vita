@@ -169,9 +169,7 @@ func (a *App) growthTab(c *ui.Context, pal Palette, member model.Member, hasMemb
 				}
 				if ui.PrimaryButton(c, addLbl).Grow(1).Basis(0).Clicked() {
 					if isCustom {
-						a.CustomValMetric = customMetrics[a.GrowthMetricIdx-4].ID
-						a.CustomValInput, a.CustomValNote = "", ""
-						a.ShowCustomValForm = true
+						a.openCustomValFormFor(customMetrics[a.GrowthMetricIdx-4].ID)
 					} else {
 						a.openGrowthForm()
 					}
@@ -226,7 +224,7 @@ func (a *App) growthTab(c *ui.Context, pal Palette, member model.Member, hasMemb
 											Background(pal.TealSoft).TextColor(pal.Teal)
 									}
 								})
-								sub := time.UnixMilli(row.ts).Format("2006-01-02 15:04")
+								sub := time.UnixMilli(row.ts).Format("2006-01-02")
 								if row.note != "" {
 									sub += " · " + row.note
 								}

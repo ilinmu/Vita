@@ -38,16 +38,22 @@ func TestGenerateScreenshots(t *testing.T) {
 		ColorHex:  "#0D9488",
 	})
 	_, _ = st.SaveMember(model.Member{
+		Name:      "小柚子",
+		Gender:    model.GenderFemale,
+		BirthDate: now.AddDate(-1, -2, 0).Format("2006-01-02"),
+		ColorHex:  "#E11D48",
+	})
+	_, _ = st.SaveMember(model.Member{
 		Name:      "妈妈",
 		Gender:    model.GenderFemale,
 		BirthDate: "1993-08-18",
-		ColorHex:  "#EC4899",
+		ColorHex:  "#6366F1",
 	})
 	_, _ = st.SaveMember(model.Member{
 		Name:      "爸爸",
 		Gender:    model.GenderMale,
 		BirthDate: "1991-04-12",
-		ColorHex:  "#6366F1",
+		ColorHex:  "#2563EB",
 	})
 	_ = st.UpdateConfig(func(c *localstore.Config) {
 		c.ActiveMemberID = child.ID
@@ -136,7 +142,7 @@ func TestGenerateScreenshots(t *testing.T) {
 		MemberID:   child.ID,
 		EpisodeID:  ep.ID,
 		RecordedAt: now.Add(-10*time.Hour - 40*time.Minute).UnixMilli(),
-		MedType:    model.MedIbuprofen,
+		MedType:    model.MedAntipyretic,
 		Name:       "美林",
 		Dosage:     "4 ml",
 	})
